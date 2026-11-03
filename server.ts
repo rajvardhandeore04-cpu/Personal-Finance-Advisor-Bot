@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
@@ -28,7 +29,7 @@ const ai = new GoogleGenAI({
 // Helper for financial fallback recommendations
 function generateRuleBasedFinancialAdvice(context: any, userPrompt: string) {
   const { profile, metrics, budgets, overspentCategories } = context;
-  const currency = profile?.currency || '$';
+  const currency = profile?.currency || '₹';
   const totalIncome = metrics?.totalIncome || 0;
   const totalExpenses = metrics?.totalExpenses || 0;
   const savings = totalIncome - totalExpenses;
@@ -247,7 +248,8 @@ app.post('/api/advisor/generate-budget', async (req: Request, res: Response) => 
 
     const prompt = `As an expert financial planning AI, generate an optimized, realistic monthly budget plan for:
 Role: ${profile?.roleTitle || 'Individual'} (${profile?.scenario || 'General'})
-Monthly Net Income: $${income}
+Monthly Net Income: ₹${income}
+Currency: ${profile?.currency || '₹'} (Indian Rupee)
 Budget Framework: ${framework}
 Recent Spending Context: ${JSON.stringify(currentExpenses?.slice(0, 15) || [])}
 
@@ -256,15 +258,15 @@ Return a valid JSON object with the following schema:
   "framework": "${framework}",
   "monthlyIncome": ${income},
   "recommendedBudgets": [
-    { "category": "Housing & Rent", "limit": 1500, "reason": "Explanation" },
-    { "category": "Groceries & Food", "limit": 500, "reason": "Explanation" },
-    { "category": "Dining & Coffee", "limit": 200, "reason": "Explanation" },
-    { "category": "Utilities & Bills", "limit": 250, "reason": "Explanation" },
-    { "category": "Transportation", "limit": 300, "reason": "Explanation" },
-    { "category": "Healthcare & Wellness", "limit": 150, "reason": "Explanation" },
-    { "category": "Entertainment & Leisure", "limit": 180, "reason": "Explanation" },
-    { "category": "Subscriptions", "limit": 60, "reason": "Explanation" },
-    { "category": "Miscellaneous", "limit": 120, "reason": "Explanation" }
+    { "category": "Housing & Rent", "limit": 25000, "reason": "Explanation" },
+    { "category": "Groceries & Food", "limit": 10000, "reason": "Explanation" },
+    { "category": "Dining & Coffee", "limit": 4500, "reason": "Explanation" },
+    { "category": "Utilities & Bills", "limit": 4000, "reason": "Explanation" },
+    { "category": "Transportation", "limit": 5000, "reason": "Explanation" },
+    { "category": "Healthcare & Wellness", "limit": 3000, "reason": "Explanation" },
+    { "category": "Entertainment & Leisure", "limit": 3500, "reason": "Explanation" },
+    { "category": "Subscriptions", "limit": 1200, "reason": "Explanation" },
+    { "category": "Miscellaneous", "limit": 2500, "reason": "Explanation" }
   ],
   "savingsTarget": ${Math.round(income * 0.20)},
   "rationale": "Clear 2-3 sentence strategic rationale explaining why this budget is realistic and beneficial for this user profile."
@@ -317,25 +319,26 @@ app.post('/api/advisor/monthly-report', async (req: Request, res: Response) => {
 
     const prompt = `You are a Chief Financial Officer and Personal Financial Planning Advisor analyzing a monthly closing statement for:
 User: ${profile?.name} (${profile?.roleTitle})
+Currency: ${currency} (Indian Rupee)
 Report Metrics:
-- Total Income: $${totalIncome}
-- Total Expenses: $${totalExpenses}
-- Net Savings: $${netSavings} (Savings Rate: ${savingsRate}%)
-- Essential Expenses: $${reportData?.essentialExpenses}
-- Discretionary Expenses: $${reportData?.discretionaryExpenses}
+- Total Income: ₹${totalIncome}
+- Total Expenses: ₹${totalExpenses}
+- Net Savings: ₹${netSavings} (Savings Rate: ${savingsRate}%)
+- Essential Expenses: ₹${reportData?.essentialExpenses}
+- Discretionary Expenses: ₹${reportData?.discretionaryExpenses}
 - Category Breakdown: ${JSON.stringify(reportData?.categoryBreakdown || [])}
 
 Return a JSON object with:
 {
-  "executiveSummary": "Concise, professional 3-sentence summary of the month's financial performance, highlights, and primary takeaway.",
+  "executiveSummary": "Concise, professional 3-sentence summary of the month's financial performance, highlights, and primary takeaway in Indian Rupees.",
   "financialHealthStatus": "Optimal" | "Stable" | "Attention Needed",
-  "topOverrunNotes": ["Specific note on overruns"],
+  "topOverrunNotes": ["Specific note on overruns in Rupees"],
   "strategicRecommendations": [
     "Actionable recommendation 1",
     "Actionable recommendation 2",
     "Actionable recommendation 3"
   ],
-  "nextMonthTargetSavings": 1200
+  "nextMonthTargetSavings": 25000
 }`;
 
     const response = await ai.models.generateContent({
@@ -352,6 +355,17 @@ Return a JSON object with:
   } catch (err: any) {
     console.error('Monthly report error:', err);
     res.status(500).json({ error: 'Failed to generate monthly report' });
+  }
+});
+
+// Download full project source archive (.tar.gz)
+app.get('/api/download-project', (_req: Request, res: Response) => {
+  const archivePath = path.resolve(__dirname, 'personal-finance-advisor-bot.tar.gz');
+  if (fs.existsSync(archivePath)) {
+    res.setHeader('Content-Disposition', 'attachment; filename="personal-finance-advisor-bot.tar.gz"');
+    res.download(archivePath, 'personal-finance-advisor-bot.tar.gz');
+  } else {
+    res.status(404).json({ error: 'Archive not found. Please pull the files directly.' });
   }
 });
 
